@@ -1,40 +1,17 @@
-name: PR Tarball
+name: PR Tarball (Build)
 on:
-  pull_request_target:
+  pull_request:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  authorize:
-    runs-on: ubuntu-latest
-    outputs:
-      is_authorized: ${{ steps.check.outputs.is_authorized }}
-    steps:
-      - name: Check authorization
-        id: check
-        env:
-          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
-          ACTOR: ${{ github.actor }}
-        run: |
-          if [[ ",$AUTHORIZED_USERS," == *",$ACTOR,"* ]]; then
-            echo "✅ User $ACTOR is authorized"
-            echo "is_authorized=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "⏭️ User $ACTOR is not in AUTHORIZED_USERS — skipping."
-            echo "is_authorized=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  pr-tarball:
-    needs: authorize
-    if: needs.authorize.outputs.is_authorized == 'true'
+  build-tarball:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -52,42 +29,10 @@ jobs:
         id: tarball
         run: |
           TARBALL_NAME=$(ls *.tgz | head -1 | xargs basename)
-          echo "name=$TARBALL_NAME" >> $GITHUB_OUTPUT
-      - name: Create or update PR release
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          TARBALL_NAME: ${{ steps.tarball.outputs.name }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          REPO: ${{ github.repository }}
-        run: |
-          TAG="pr-${PR_NUMBER}-tarball"
-
-          # Delete existing release if it exists (to update the tarball)
-          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
-
-          # Create a new pre-release with the tarball
-          gh release create "$TAG" \
-            "${TARBALL_NAME}" \
-            --title "PR #${PR_NUMBER} Tarball" \
-            --notes "Auto-generated tarball for PR #${PR_NUMBER}." \
-            --draft \
-            --target "$PR_HEAD_SHA"
-
-          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${TARBALL_NAME}"
-          echo "url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-      - name: Comment on PR
-        uses: marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0 # v3.0.4
+          echo "name=$TARBALL_NAME" >> "$GITHUB_OUTPUT"
+      - name: Upload tarball as artifact
+        uses: actions/upload-artifact@ea165f8d65b6db9a6b7c67862cd61e8cede3b60e # v4
         with:
-          header: tarball
-          message: |
-            ## Package Tarball
-
-            **[${{ steps.tarball.outputs.name }}](${{ steps.release.outputs.url }})**
-
-            ### How to install
-
-            ```bash
-            npm install ${{ steps.release.outputs.url }}
-            ```
+          name: pr-tarball
+          path: '*.tgz'
+          retention-days: 30

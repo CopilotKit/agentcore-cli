@@ -2,14 +2,16 @@ name: E2E Tests
 on:
   workflow_dispatch:
     inputs:
+      pr_number:
+        description: 'PR number to test (checks out the PR merge ref)'
+        required: false
+        type: string
       aws_region:
         description: 'AWS region for deployment'
         default: 'us-east-1'
-  pull_request_target:
-    branches: [main]
 
 concurrency:
-  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  group: e2e-${{ inputs.pr_number || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -17,36 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  authorize:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request_target'
-    outputs:
-      is_authorized: ${{ steps.check.outputs.is_authorized }}
-    steps:
-      - name: Check authorization
-        id: check
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
-          ACTOR: ${{ github.actor }}
-        run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "✅ Manual workflow dispatch — authorized"
-            echo "is_authorized=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ ",$AUTHORIZED_USERS," == *",$ACTOR,"* ]]; then
-            echo "✅ User $ACTOR is authorized"
-            echo "is_authorized=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "⏭️ User $ACTOR is not in AUTHORIZED_USERS — skipping E2E tests."
-            echo "ℹ️ External contributors: ask a maintainer to run the E2E tests manually via workflow_dispatch."
-            echo "is_authorized=false" >> "$GITHUB_OUTPUT"
-          fi
-
   e2e:
-    needs: authorize
-    if: needs.authorize.outputs.is_authorized == 'true'
     runs-on: ubuntu-latest
     environment: e2e-testing
     timeout-minutes: 30
@@ -55,9 +28,21 @@ jobs:
       matrix:
         cdk-source: [npm, main]
     steps:
+      - name: Resolve checkout ref
+        id: ref
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          if [[ -n "$PR_NUMBER" ]]; then
+            echo "ref=refs/pull/${PR_NUMBER}/merge" >> "$GITHUB_OUTPUT"
+            echo "Checking out PR #${PR_NUMBER} merge ref"
+          else
+            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+            echo "Checking out ${{ github.ref }}"
+          fi
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ steps.ref.outputs.ref }}
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
