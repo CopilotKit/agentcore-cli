@@ -59,8 +59,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install dependencies
         run: npm ci
@@ -122,7 +122,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --local url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Create release branch and PR
         env:
@@ -240,8 +240,8 @@ jobs:
 
       - name: Configure git for tests
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install uv for Python tests
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -382,14 +382,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --local url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Create and push tag
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
 
