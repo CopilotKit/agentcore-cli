@@ -21,8 +21,8 @@ jobs:
 
       - name: Analyze major version bump
         if: >-
-          steps.metadata.outputs.package-ecosystem == 'github_actions' &&
-          steps.metadata.outputs.update-type == 'version-update:semver-major'
+          steps.metadata.outputs.package-ecosystem == 'github_actions' && steps.metadata.outputs.update-type ==
+          'version-update:semver-major'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           DEP_NAME: ${{ steps.metadata.outputs.dependency-names }}

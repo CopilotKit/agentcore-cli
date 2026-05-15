@@ -21,8 +21,8 @@ jobs:
 
       - name: Auto-approve and merge minor/patch github-actions updates
         if: >-
-          steps.metadata.outputs.package-ecosystem == 'github_actions' &&
-          (steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.package-ecosystem == 'github_actions' && (steps.metadata.outputs.update-type ==
+          'version-update:semver-minor' ||
            steps.metadata.outputs.update-type == 'version-update:semver-patch')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

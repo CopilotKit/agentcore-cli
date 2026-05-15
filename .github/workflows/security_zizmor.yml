@@ -4,18 +4,18 @@ on:
   push:
     branches: [main, master]
     paths:
-      - ".github/workflows/**"
-      - ".github/actions/**"
-      - ".github/zizmor.yml"
-      - ".github/dependabot.yml"
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/zizmor.yml'
+      - '.github/dependabot.yml'
   pull_request:
     paths:
-      - ".github/workflows/**"
-      - ".github/actions/**"
-      - ".github/zizmor.yml"
-      - ".github/dependabot.yml"
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - '.github/zizmor.yml'
+      - '.github/dependabot.yml'
   schedule:
-    - cron: "0 9 * * 1"
+    - cron: '0 9 * * 1'
   workflow_dispatch:
 
 concurrency:
