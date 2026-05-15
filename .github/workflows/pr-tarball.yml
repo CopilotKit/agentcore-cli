@@ -31,7 +31,7 @@ jobs:
           TARBALL_NAME=$(ls *.tgz | head -1 | xargs basename)
           echo "name=$TARBALL_NAME" >> "$GITHUB_OUTPUT"
       - name: Upload tarball as artifact
-        uses: actions/upload-artifact@ea165f8d65b6db9a6b7c67862cd61e8cede3b60e # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr-tarball
           path: '*.tgz'

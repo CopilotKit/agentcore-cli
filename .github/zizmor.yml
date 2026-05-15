@@ -13,6 +13,10 @@ rules:
       - pr-size.yml
       # Pre-existing: pr-title.yml uses pull_request_target for title validation.
       - pr-title.yml
+      # pr-tarball-publish.yml uses workflow_run to run in base-branch context
+      # with write permissions. It never checks out or executes PR code — it only
+      # downloads the build artifact and publishes it as a GitHub release.
+      - pr-tarball-publish.yml
 
   # Pre-existing: template expansions in composite action and workflow run steps.
   # strands-action uses inputs.* in run steps (composite action, inputs are typed).

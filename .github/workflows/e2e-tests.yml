@@ -32,13 +32,14 @@ jobs:
         id: ref
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
+          GH_REF: ${{ github.ref }}
         run: |
           if [[ -n "$PR_NUMBER" ]]; then
             echo "ref=refs/pull/${PR_NUMBER}/merge" >> "$GITHUB_OUTPUT"
             echo "Checking out PR #${PR_NUMBER} merge ref"
           else
-            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
-            echo "Checking out ${{ github.ref }}"
+            echo "ref=${GH_REF}" >> "$GITHUB_OUTPUT"
+            echo "Checking out ${GH_REF}"
           fi
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
