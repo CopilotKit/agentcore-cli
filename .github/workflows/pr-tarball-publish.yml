@@ -28,12 +28,14 @@ jobs:
           PR_NUMBER=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}" \
             --jq '.pull_requests[0].number')
           if [[ -z "$PR_NUMBER" || "$PR_NUMBER" == "null" ]]; then
-            echo "::error::Could not determine PR number from workflow run"
-            exit 1
+            echo "No PR associated with this workflow run (likely a push to main). Skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Download tarball artifact
+        if: steps.pr.outputs.skip != 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: pr-tarball
@@ -41,12 +43,14 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Get tarball info
+        if: steps.pr.outputs.skip != 'true'
         id: tarball
         run: |
           TARBALL_NAME=$(ls *.tgz | head -1 | xargs basename)
           echo "name=$TARBALL_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Create or update PR release
+        if: steps.pr.outputs.skip != 'true'
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -72,6 +76,7 @@ jobs:
           echo "url=$DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
 
       - name: Comment on PR
+        if: steps.pr.outputs.skip != 'true'
         uses: marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0 # v3.0.4
         with:
           number: ${{ steps.pr.outputs.number }}
