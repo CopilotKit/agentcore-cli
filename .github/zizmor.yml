@@ -1,0 +1,52 @@
+rules:
+  dangerous-triggers:
+    ignore:
+      # Dependabot auto-merge: uses pull_request_target for write token.
+      # Does NOT checkout PR code. Actor-gated to dependabot[bot].
+      - dependabot-auto-merge.yml
+      # Dependabot major analysis: uses pull_request_target for PR comments.
+      # Does NOT checkout PR code. Actor-gated to dependabot[bot].
+      - dependabot-major-analysis.yml
+      # Pre-existing: codeql.yml uses pull_request_target for code scanning.
+      - codeql.yml
+      # Pre-existing: pr-size.yml uses pull_request_target for PR labels.
+      - pr-size.yml
+      # Pre-existing: pr-title.yml uses pull_request_target for title validation.
+      - pr-title.yml
+      # pr-tarball-publish.yml uses workflow_run to run in base-branch context
+      # with write permissions. It never checks out or executes PR code — it only
+      # downloads the build artifact and publishes it as a GitHub release.
+      - pr-tarball-publish.yml
+
+  # Pre-existing: template expansions in composite action and workflow run steps.
+  # strands-action uses inputs.* in run steps (composite action, inputs are typed).
+  # strands-command.yml interpolates inputs.* and github.event.issue.number into
+  # actions/github-script blocks; write-access-only triggers make exploitation unlikely.
+  template-injection:
+    ignore:
+      - action.yml
+      - strands-command.yml
+
+  # Pre-existing: composite action uses unpinned action references.
+  # These are first-party or well-known actions within the composite action.
+  unpinned-uses:
+    ignore:
+      - action.yml
+
+  # Pre-existing: release.yml sets broad permissions at workflow level.
+  # release needs contents/pull-requests write for creating releases.
+  excessive-permissions:
+    ignore:
+      - release.yml
+
+  # e2e-tests.yml writes to GITHUB_ENV (CDK_TARBALL path from npm pack).
+  # The value comes from a trusted local command, not user input.
+  # Workflow is now workflow_dispatch-only (maintainer-triggered).
+  github-env:
+    ignore:
+      - e2e-tests.yml
+
+  # Pre-existing: release.yml uses setup-node with caching enabled.
+  cache-poisoning:
+    ignore:
+      - release.yml
