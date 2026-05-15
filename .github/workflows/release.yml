@@ -244,7 +244,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install uv for Python tests
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
 
       - name: Run linter
         run: npm run lint
