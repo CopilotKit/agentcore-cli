@@ -1,0 +1,57 @@
+rules:
+  dangerous-triggers:
+    ignore:
+      # Dependabot auto-merge: uses pull_request_target for write token.
+      # Does NOT checkout PR code. Actor-gated to dependabot[bot].
+      - dependabot-auto-merge.yml
+      # Dependabot major analysis: uses pull_request_target for PR comments.
+      # Does NOT checkout PR code. Actor-gated to dependabot[bot].
+      - dependabot-major-analysis.yml
+      # Pre-existing: codeql.yml uses pull_request_target for code scanning.
+      - codeql.yml
+      # Pre-existing: e2e-tests.yml uses pull_request_target to access secrets
+      # for end-to-end testing infrastructure.
+      - e2e-tests.yml
+      # Pre-existing: pr-size.yml uses pull_request_target for PR labels.
+      - pr-size.yml
+      # Pre-existing: pr-tarball.yml uses pull_request_target to post build
+      # artifacts as PR comments.
+      - pr-tarball.yml
+      # Pre-existing: pr-title.yml uses pull_request_target for title validation.
+      - pr-title.yml
+
+  # Pre-existing: template expansions in composite action and workflow run steps.
+  # strands-action uses inputs.* in run steps (composite action, inputs are typed).
+  # strands-command.yml interpolates inputs.* and github.event.issue.number into
+  # actions/github-script blocks; write-access-only triggers make exploitation unlikely.
+  template-injection:
+    ignore:
+      - action.yml
+      - strands-command.yml
+
+  # Pre-existing: composite action uses unpinned action references.
+  # These are first-party or well-known actions within the composite action.
+  unpinned-uses:
+    ignore:
+      - action.yml
+
+  # Pre-existing: e2e-tests.yml and release.yml set broad permissions
+  # at workflow level. e2e needs id-token for cloud auth. release needs
+  # contents/pull-requests write for creating releases.
+  # pr-tarball.yml needs contents/pull-requests write for posting artifacts.
+  excessive-permissions:
+    ignore:
+      - e2e-tests.yml
+      - pr-tarball.yml
+      - release.yml
+
+  # Pre-existing: e2e-tests.yml writes to GITHUB_ENV from a step output.
+  # The value comes from a trusted GitHub Actions context, not user input.
+  github-env:
+    ignore:
+      - e2e-tests.yml
+
+  # Pre-existing: release.yml uses setup-node with caching enabled.
+  cache-poisoning:
+    ignore:
+      - release.yml
