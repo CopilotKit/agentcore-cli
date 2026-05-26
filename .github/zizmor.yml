@@ -1,12 +1,6 @@
 rules:
   dangerous-triggers:
     ignore:
-      # Dependabot auto-merge: uses pull_request_target for write token.
-      # Does NOT checkout PR code. Actor-gated to dependabot[bot].
-      - dependabot-auto-merge.yml
-      # Dependabot major analysis: uses pull_request_target for PR comments.
-      # Does NOT checkout PR code. Actor-gated to dependabot[bot].
-      - dependabot-major-analysis.yml
       # Pre-existing: codeql.yml uses pull_request_target for code scanning.
       - codeql.yml
       # Pre-existing: pr-size.yml uses pull_request_target for PR labels.
