@@ -23,6 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: e2e-testing
     timeout-minutes: 30
+    env:
+      # Single source for the AWS region default. On `workflow_dispatch` the
+      # input applies; on other events `inputs` is empty so the fallback applies.
+      AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
     strategy:
       fail-fast: false
       matrix:
@@ -58,7 +62,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: ${{ secrets.E2E_AWS_ROLE_ARN }}
-          aws-region: ${{ inputs.aws_region || 'us-east-1' }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: Get AWS Account ID
         id: aws
         run: echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
@@ -74,12 +78,18 @@ jobs:
       - name: Build CDK package from main
         if: matrix.cdk-source == 'main'
         run: |
+          set -euo pipefail
+          [ -n "${CDK_REPO_TOKEN}" ] && [ -n "${CDK_REPO}" ] || { echo "::error::CDK_REPO and CDK_REPO_TOKEN must be set"; exit 1; }
           git clone --depth 1 "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
           cd /tmp/cdk-repo
           npm ci
           npm run build
-          TARBALL=$(npm pack --pack-destination "$RUNNER_TEMP" | tail -1)
-          echo "CDK_TARBALL=$RUNNER_TEMP/$TARBALL" >> "$GITHUB_ENV"
+          TARBALL="$(npm pack --json --pack-destination "$RUNNER_TEMP" | jq -r '.[0].filename')"
+          CDK_TARBALL="$RUNNER_TEMP/$TARBALL"
+          # Fail loud: a missing tarball would silently fall back to the published
+          # CDK in installCdkTarball(), defeating the `main` matrix leg.
+          [ -f "$CDK_TARBALL" ] || { echo "::error::CDK tarball not found at '$CDK_TARBALL'"; exit 1; }
+          echo "CDK_TARBALL=$CDK_TARBALL" >> "$GITHUB_ENV"
         env:
           CDK_REPO_TOKEN: ${{ secrets.CDK_REPO_TOKEN }}
           CDK_REPO: ${{ secrets.CDK_REPO_NAME }}
@@ -87,15 +97,20 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Install CLI globally
-        run: npm install -g "$(npm pack | tail -1)"
+        run: |
+          set -euo pipefail
+          TARBALL="$(npm pack --json | jq -r '.[0].filename')"
+          npm install -g "./$TARBALL"
       - name: Run E2E tests (${{ matrix.cdk-source }})
         env:
           AWS_ACCOUNT_ID: ${{ steps.aws.outputs.account_id }}
-          AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
+          AWS_REGION: ${{ env.AWS_REGION }}
           ANTHROPIC_API_KEY: ${{ env.E2E_ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ env.E2E_OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ env.E2E_GEMINI_API_KEY }}
           CDK_TARBALL: ${{ env.CDK_TARBALL }}
-        # Only run Bedrock tests on PRs to avoid creating ApiKeyCredentialProviders,
-        # which have a 50-resource account limit and accumulate from interrupted runs.
+        # This manual/dispatch workflow runs only the Bedrock subset (strands-bedrock,
+        # langgraph-bedrock) to limit creation of ApiKeyCredentialProviders, which have a
+        # 50-resource account limit and accumulate from interrupted runs. The full suite
+        # runs in e2e-tests-full.yml.
         run: npx vitest run --project e2e strands-bedrock langgraph-bedrock
