@@ -64,7 +64,7 @@ jobs:
         if: matrix.cdk-source == 'main'
         run: |
           set -euo pipefail
-          [ -n "${CDK_REPO_TOKEN:-}" ] && [ -n "${CDK_REPO:-}" ] || { echo "::error::CDK_REPO and CDK_REPO_TOKEN must be set"; exit 1; }
+          [ -n "${CDK_REPO_TOKEN:-}" ] && [ -n "${CDK_REPO:-}" ] || { echo "::error::Required secrets CDK_REPO_NAME and CDK_REPO_TOKEN are not configured"; exit 1; }
           git clone --depth 1 --branch main "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
           cd /tmp/cdk-repo
           npm ci
