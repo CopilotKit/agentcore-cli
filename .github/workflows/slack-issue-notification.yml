@@ -12,15 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send issue details to Slack
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: webhook-trigger
+          webhook: ${{ secrets.SLACK_WEBHOOK_OSS_ALERTS }}
+          webhook-type: incoming-webhook
           payload: |
-            issue_title: "${{ github.event.issue.title }}"
-            issue_number: "${{ github.event.issue.number }}"
-            issue_url: "${{ github.event.issue.html_url }}"
-            issue_author: "${{ github.event.issue.user.login }}"
-            issue_body: ${{ toJSON(github.event.issue.body) }}
-            repository: "${{ github.repository }}"
-            created_at: "${{ github.event.issue.created_at }}"
+            { "text": ${{ toJSON(format(':inbox_tray: *New issue in {0}*: #{1} {2} (by {3})\n{4}', github.repository, github.event.issue.number, github.event.issue.title, github.event.issue.user.login, github.event.issue.html_url)) }} }

@@ -40,12 +40,9 @@ jobs:
             );
 
       - name: Send open PRs summary to Slack
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
         with:
-          webhook: ${{ secrets.SLACK_OPEN_PRS_WEBHOOK_URL }}
-          webhook-type: webhook-trigger
+          webhook: ${{ secrets.SLACK_WEBHOOK_OSS_ALERTS }}
+          webhook-type: incoming-webhook
           payload: |
-            pr_count: "${{ steps.open-prs.outputs.count }}"
-            pr_list: ${{ toJSON(steps.open-prs.outputs.pr_list) }}
-            repository: "${{ github.repository }}"
-            repository_url: "https://github.com/${{ github.repository }}/pulls"
+            { "text": ${{ toJSON(format(':bar_chart: *Open PRs in {0}* ({1}): https://github.com/{0}/pulls\n{2}', github.repository, steps.open-prs.outputs.count, steps.open-prs.outputs.pr_list)) }} }
