@@ -2,7 +2,7 @@ name: Slack Open PRs Notification
 
 on:
   schedule:
-    - cron: '0 13 * * *' # 8:00 AM EST (13:00 UTC)
+    - cron: '0 13 * * *' # 13:00 UTC daily (08:00 EST / 09:00 EDT — cron does not observe DST)
   workflow_dispatch:
 
 permissions:
@@ -17,35 +17,36 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
-            const { data: prs } = await github.rest.pulls.list({
+            const prs = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
+              per_page: 100,
             });
 
             const count = prs.length;
 
             // Format each PR with plain text and bare URL (Slack auto-links URLs)
             const prList = prs.map(pr =>
-              `• #${pr.number} - ${pr.title} (by ${pr.user.login})\n  ${pr.html_url}`
+              `• #${pr.number} - ${pr.title} (by ${pr.user?.login ?? 'unknown'})\n  ${pr.html_url}`
             ).join('\n');
 
             core.setOutput('count', count);
 
             // Use GITHUB_OUTPUT delimiter for multiline support
+            const crypto = require('crypto');
+            const delimiter = `PRLIST_${crypto.randomUUID()}`;
             const fs = require('fs');
             fs.appendFileSync(
               process.env.GITHUB_OUTPUT,
-              `pr_list<<PRLIST_EOF\n${prList}\nPRLIST_EOF\n`
+              `pr_list<<${delimiter}\n${prList}\n${delimiter}\n`
             );
 
       - name: Send open PRs summary to Slack
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        if: ${{ steps.open-prs.outputs.count != '0' }}
+        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
         with:
-          webhook: ${{ secrets.SLACK_OPEN_PRS_WEBHOOK_URL }}
-          webhook-type: webhook-trigger
+          webhook: ${{ secrets.SLACK_WEBHOOK_OSS_ALERTS }}
+          webhook-type: incoming-webhook
           payload: |
-            pr_count: "${{ steps.open-prs.outputs.count }}"
-            pr_list: ${{ toJSON(steps.open-prs.outputs.pr_list) }}
-            repository: "${{ github.repository }}"
-            repository_url: "https://github.com/${{ github.repository }}/pulls"
+            { "text": ${{ toJSON(format(':bar_chart: *Open PRs in {0}* ({1}): https://github.com/{0}/pulls\n{2}', github.repository, steps.open-prs.outputs.count, steps.open-prs.outputs.pr_list)) }} }

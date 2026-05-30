@@ -9,6 +9,7 @@ on:
       aws_region:
         description: 'AWS region for deployment'
         default: 'us-east-1'
+        type: string
 
 concurrency:
   group: e2e-${{ inputs.pr_number || github.ref }}
@@ -23,6 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: e2e-testing
     timeout-minutes: 30
+    env:
+      # Single source for the AWS region default. This workflow is
+      # dispatch-only, so the input always applies; the fallback guards the
+      # case where the optional `aws_region` input is left blank on dispatch.
+      AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
     strategy:
       fail-fast: false
       matrix:
@@ -55,10 +61,10 @@ jobs:
           git config --global user.name "CI"
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: ${{ secrets.E2E_AWS_ROLE_ARN }}
-          aws-region: ${{ inputs.aws_region || 'us-east-1' }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: Get AWS Account ID
         id: aws
         run: echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
@@ -74,12 +80,19 @@ jobs:
       - name: Build CDK package from main
         if: matrix.cdk-source == 'main'
         run: |
-          git clone --depth 1 "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
+          set -euo pipefail
+          [ -n "${CDK_REPO_TOKEN:-}" ] && [ -n "${CDK_REPO:-}" ] || { echo "::error::Required secrets CDK_REPO_NAME and CDK_REPO_TOKEN are not configured"; exit 1; }
+          git clone --depth 1 --branch main "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
           cd /tmp/cdk-repo
           npm ci
           npm run build
-          TARBALL=$(npm pack --pack-destination "$RUNNER_TEMP" | tail -1)
-          echo "CDK_TARBALL=$RUNNER_TEMP/$TARBALL" >> "$GITHUB_ENV"
+          TARBALL="$(npm pack --json --pack-destination "$RUNNER_TEMP" | jq -r '.[0].filename')"
+          [ -n "$TARBALL" ] && [ "$TARBALL" != "null" ] || { echo "::error::npm pack produced no tarball"; exit 1; }
+          CDK_TARBALL="$RUNNER_TEMP/$TARBALL"
+          # Fail loud: a missing tarball would silently fall back to the published
+          # CDK in installCdkTarball(), defeating the `main` matrix leg.
+          [ -f "$CDK_TARBALL" ] || { echo "::error::CDK tarball not found at '$CDK_TARBALL'"; exit 1; }
+          echo "CDK_TARBALL=$CDK_TARBALL" >> "$GITHUB_ENV"
         env:
           CDK_REPO_TOKEN: ${{ secrets.CDK_REPO_TOKEN }}
           CDK_REPO: ${{ secrets.CDK_REPO_NAME }}
@@ -87,15 +100,22 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Install CLI globally
-        run: npm install -g "$(npm pack | tail -1)"
+        run: |
+          set -euo pipefail
+          TARBALL="$(npm pack --json | jq -r '.[0].filename')"
+          [ -n "$TARBALL" ] && [ "$TARBALL" != "null" ] || { echo "::error::npm pack produced no tarball"; exit 1; }
+          npm install -g "./$TARBALL"
       - name: Run E2E tests (${{ matrix.cdk-source }})
         env:
           AWS_ACCOUNT_ID: ${{ steps.aws.outputs.account_id }}
-          AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
           ANTHROPIC_API_KEY: ${{ env.E2E_ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ env.E2E_OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ env.E2E_GEMINI_API_KEY }}
           CDK_TARBALL: ${{ env.CDK_TARBALL }}
-        # Only run Bedrock tests on PRs to avoid creating ApiKeyCredentialProviders,
-        # which have a 50-resource account limit and accumulate from interrupted runs.
+        # This manual/dispatch workflow runs the lighter Bedrock-related e2e subset
+        # to keep the per-PR run fast, rather than the full suite (which runs in
+        # e2e-tests-full.yml). The args below are vitest substring path filters, so
+        # this matches every test file whose path contains `strands-bedrock` or
+        # `langgraph-bedrock` (e.g. strands-bedrock, strands-bedrock-memory,
+        # container-strands-bedrock, langgraph-bedrock), not just two suites.
         run: npx vitest run --project e2e strands-bedrock langgraph-bedrock
