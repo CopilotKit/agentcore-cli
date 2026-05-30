@@ -55,7 +55,7 @@ jobs:
           git config --global user.name "CI"
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: ${{ secrets.E2E_AWS_ROLE_ARN }}
           aws-region: ${{ inputs.aws_region || 'us-east-1' }}
