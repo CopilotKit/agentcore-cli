@@ -9,6 +9,7 @@ on:
       aws_region:
         description: 'AWS region for deployment'
         default: 'us-east-1'
+        type: string
 
 concurrency:
   group: e2e-${{ inputs.pr_number || github.ref }}
@@ -79,12 +80,13 @@ jobs:
         if: matrix.cdk-source == 'main'
         run: |
           set -euo pipefail
-          [ -n "${CDK_REPO_TOKEN}" ] && [ -n "${CDK_REPO}" ] || { echo "::error::CDK_REPO and CDK_REPO_TOKEN must be set"; exit 1; }
-          git clone --depth 1 "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
+          [ -n "${CDK_REPO_TOKEN:-}" ] && [ -n "${CDK_REPO:-}" ] || { echo "::error::CDK_REPO and CDK_REPO_TOKEN must be set"; exit 1; }
+          git clone --depth 1 --branch main "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
           cd /tmp/cdk-repo
           npm ci
           npm run build
           TARBALL="$(npm pack --json --pack-destination "$RUNNER_TEMP" | jq -r '.[0].filename')"
+          [ -n "$TARBALL" ] && [ "$TARBALL" != "null" ] || { echo "::error::npm pack produced no tarball"; exit 1; }
           CDK_TARBALL="$RUNNER_TEMP/$TARBALL"
           # Fail loud: a missing tarball would silently fall back to the published
           # CDK in installCdkTarball(), defeating the `main` matrix leg.
@@ -100,17 +102,19 @@ jobs:
         run: |
           set -euo pipefail
           TARBALL="$(npm pack --json | jq -r '.[0].filename')"
+          [ -n "$TARBALL" ] && [ "$TARBALL" != "null" ] || { echo "::error::npm pack produced no tarball"; exit 1; }
           npm install -g "./$TARBALL"
       - name: Run E2E tests (${{ matrix.cdk-source }})
         env:
           AWS_ACCOUNT_ID: ${{ steps.aws.outputs.account_id }}
-          AWS_REGION: ${{ env.AWS_REGION }}
           ANTHROPIC_API_KEY: ${{ env.E2E_ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ env.E2E_OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ env.E2E_GEMINI_API_KEY }}
           CDK_TARBALL: ${{ env.CDK_TARBALL }}
-        # This manual/dispatch workflow runs only the Bedrock subset (strands-bedrock,
-        # langgraph-bedrock) to limit creation of ApiKeyCredentialProviders, which have a
-        # 50-resource account limit and accumulate from interrupted runs. The full suite
-        # runs in e2e-tests-full.yml.
+        # This manual/dispatch workflow runs the lighter Bedrock-related e2e subset
+        # to keep the per-PR run fast, rather than the full suite (which runs in
+        # e2e-tests-full.yml). The args below are vitest substring path filters, so
+        # this matches every test file whose path contains `strands-bedrock` or
+        # `langgraph-bedrock` (e.g. strands-bedrock, strands-bedrock-memory,
+        # container-strands-bedrock, langgraph-bedrock), not just two suites.
         run: npx vitest run --project e2e strands-bedrock langgraph-bedrock

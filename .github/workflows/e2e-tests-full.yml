@@ -5,6 +5,7 @@ on:
       aws_region:
         description: 'AWS region for deployment'
         default: 'us-east-1'
+        type: string
   schedule:
     - cron: '0 14 * * 1' # Mondays 14:00 UTC (09:00 EST / 10:00 EDT — cron does not observe DST)
 
@@ -63,12 +64,13 @@ jobs:
         if: matrix.cdk-source == 'main'
         run: |
           set -euo pipefail
-          [ -n "${CDK_REPO_TOKEN}" ] && [ -n "${CDK_REPO}" ] || { echo "::error::CDK_REPO and CDK_REPO_TOKEN must be set"; exit 1; }
-          git clone --depth 1 "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
+          [ -n "${CDK_REPO_TOKEN:-}" ] && [ -n "${CDK_REPO:-}" ] || { echo "::error::CDK_REPO and CDK_REPO_TOKEN must be set"; exit 1; }
+          git clone --depth 1 --branch main "https://x-access-token:${CDK_REPO_TOKEN}@github.com/${CDK_REPO}.git" /tmp/cdk-repo
           cd /tmp/cdk-repo
           npm ci
           npm run build
           TARBALL="$(npm pack --json --pack-destination "$RUNNER_TEMP" | jq -r '.[0].filename')"
+          [ -n "$TARBALL" ] && [ "$TARBALL" != "null" ] || { echo "::error::npm pack produced no tarball"; exit 1; }
           CDK_TARBALL="$RUNNER_TEMP/$TARBALL"
           # Fail loud: a missing tarball would silently fall back to the published
           # CDK in installCdkTarball(), defeating the `main` matrix leg.
@@ -81,11 +83,11 @@ jobs:
         run: |
           set -euo pipefail
           TARBALL="$(npm pack --json | jq -r '.[0].filename')"
+          [ -n "$TARBALL" ] && [ "$TARBALL" != "null" ] || { echo "::error::npm pack produced no tarball"; exit 1; }
           npm install -g "./$TARBALL"
       - name: Run E2E tests (${{ matrix.cdk-source }})
         env:
           AWS_ACCOUNT_ID: ${{ steps.aws.outputs.account_id }}
-          AWS_REGION: ${{ env.AWS_REGION }}
           ANTHROPIC_API_KEY: ${{ env.E2E_ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ env.E2E_OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ env.E2E_GEMINI_API_KEY }}
