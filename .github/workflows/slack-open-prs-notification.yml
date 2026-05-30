@@ -2,7 +2,7 @@ name: Slack Open PRs Notification
 
 on:
   schedule:
-    - cron: '0 13 * * *' # 8:00 AM EST (13:00 UTC)
+    - cron: '0 13 * * *' # 13:00 UTC daily (08:00 EST / 09:00 EDT — cron does not observe DST)
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,7 @@ jobs:
             );
 
       - name: Send open PRs summary to Slack
+        if: ${{ steps.open-prs.outputs.count != '0' }}
         uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_OSS_ALERTS }}
